@@ -1,0 +1,179 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h> // Include Servo library
+
+// Define components
+const int potPin = A0;     // Potentiometer as Humidity Sensor
+const int tempPin = A1;    // TMP36 Temperature Sensor
+const int soilMoistPin = A2; // Soil Moisture Sensor
+const int ldrPin = A3;     // Photoresistor
+const int pirPin = 2;      // PIR Sensor
+const int piezoPin = 3;    // Piezo Buzzer
+const int tempMotorPin = 8; // Temperature Motor Pin
+const int humMotorPin = 12; // Humidity Motor Pin
+const int humLed = 4;      // Humidity LED
+const int tempLed = 5;     // Temperature LED
+const int soilMoistLed = 6; // Soil Moisture LED
+const int growLightLed = 7; // Grow Light LED
+
+Servo soilServo;           // Servo for soil moisture actuator
+const int servoPin = 9;    // Pin for the servo
+
+// Slide Switch Pin
+const int slideSwitchPin = 13; // Pin to read the slide switch state
+
+// Initialize the LCD (I2C address 0x20, 16 columns, 2 rows)
+LiquidCrystal_I2C lcd(0x20, 16, 2);
+
+const int humLowThresh = 50;
+const int humHighThresh = 70;
+const int tempLowThresh = 18;
+const int tempHighThresh = 30;
+const int soilMoistThresh = 30;
+const int lightThresh = 700; // LDR threshold
+
+// Simulated time variables
+int currentHour = 6;        // Start time (6 AM)
+int dayStartHour = 6;       // Day starts at 6 AM
+int dayEndHour = 18;        // Day ends at 6 PM
+
+unsigned long previousMillis = 0; // For time simulation
+const long interval = 1000;       // 1 second = 1 hour in simulation
+
+void setup() {
+  // Initialize serial communication
+  Serial.begin(9600);
+
+  // Initialize pins
+  pinMode(humLed, OUTPUT);
+  pinMode(tempLed, OUTPUT);
+  pinMode(soilMoistLed, OUTPUT);
+  pinMode(growLightLed, OUTPUT);
+  pinMode(pirPin, INPUT);
+  pinMode(piezoPin, OUTPUT);
+  pinMode(tempMotorPin, OUTPUT);
+  pinMode(humMotorPin, OUTPUT);
+
+  // Initialize slide switch pin
+  pinMode(slideSwitchPin, INPUT);
+
+  // Attach the servo to its pin
+  soilServo.attach(servoPin);
+
+  // Initialize LCD
+  lcd.init();
+  lcd.backlight();
+}
+
+void loop() {
+  // Read the state of the slide switch
+  bool systemOn = digitalRead(slideSwitchPin);
+
+  // Check if the system is ON (slide switch is HIGH)
+  if (systemOn == HIGH) {
+    // Simulate passage of time (1 second = 1 hour)
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousMillis >= interval) {
+      previousMillis = currentMillis;
+      currentHour++;
+      if (currentHour > 23) {
+        currentHour = 0;  // Reset to midnight
+      }
+    }
+
+    // Read sensors
+    int potValue = analogRead(potPin);
+    int humidity = map(potValue, 0, 1023, 30, 90);
+
+    int tempValue = analogRead(tempPin);
+    float voltage = tempValue * (5.0 / 1023.0);
+    float temperature = (voltage - 0.5) * 100;
+
+    int soilMoistValue = analogRead(soilMoistPin);
+    int soilMoisture = map(soilMoistValue, 0, 1023, 0, 100);
+
+    int lightValue = analogRead(ldrPin);
+
+    bool motionDetected = digitalRead(pirPin);
+
+    // Humidity check and LED control
+    if (humidity < humLowThresh || humidity > humHighThresh) {
+      digitalWrite(humLed, HIGH);
+    } else {
+      digitalWrite(humLed, LOW);
+    }
+
+    // Humidity motor control
+    if (humidity > humHighThresh) {
+      digitalWrite(humMotorPin, HIGH);
+    } else {
+      digitalWrite(humMotorPin, LOW);
+    }
+
+    // Temperature check and LED control
+    if (temperature < tempLowThresh || temperature > tempHighThresh) {
+      digitalWrite(tempLed, HIGH);
+    } else {
+      digitalWrite(tempLed, LOW);
+    }
+
+    // Temperature motor control
+    if (temperature > tempHighThresh) {
+      digitalWrite(tempMotorPin, HIGH);
+    } else {
+      digitalWrite(tempMotorPin, LOW);
+    }
+
+    // Soil moisture check and servo control
+    if (soilMoisture < soilMoistThresh) {
+      digitalWrite(soilMoistLed, HIGH);
+      soilServo.write(90); // Rotate servo to 90 degrees
+    } else {
+      digitalWrite(soilMoistLed, LOW);
+      soilServo.write(0);  // Reset servo to 0 degrees
+    }
+
+    // Grow light control
+    bool isDaytime = currentHour >= dayStartHour && currentHour < dayEndHour;
+    if (lightValue < lightThresh && isDaytime) {
+      digitalWrite(growLightLed, HIGH);
+    } else {
+      digitalWrite(growLightLed, LOW);
+    }
+
+    // PIR sensor control with LED logic
+    if (motionDetected) {
+      digitalWrite(piezoPin, HIGH);
+    } else {
+      digitalWrite(piezoPin, LOW);
+    }
+
+    // LCD Display
+    lcd.setCursor(0, 0);
+    lcd.print("Hum:"); lcd.print(humidity); lcd.print("%");
+    lcd.setCursor(8, 0);
+    lcd.print("Temp:"); lcd.print(temperature, 1); lcd.print("C");
+
+    lcd.setCursor(0, 1);
+    lcd.print("Soil:"); lcd.print(soilMoisture); lcd.print("%");
+    lcd.setCursor(8, 1);
+    lcd.print(motionDetected ? "Motion" : "NoMot");
+
+    Serial.print("Light Intensity: "); Serial.println(lightValue);
+    Serial.print("Grow Light: "); Serial.println(isDaytime && lightValue < lightThresh ? "ON" : "OFF");
+  } else {
+    // If the system is OFF, turn off all components
+    digitalWrite(humLed, LOW);
+    digitalWrite(tempLed, LOW);
+    digitalWrite(soilMoistLed, LOW);
+    digitalWrite(growLightLed, LOW);
+    digitalWrite(piezoPin, LOW);
+    digitalWrite(humMotorPin, LOW);
+    digitalWrite(tempMotorPin, LOW);
+    soilServo.write(0); // Reset servo
+    lcd.noBacklight(); // Turn off LCD backlight
+    lcd.clear(); // Clear LCD display
+  }
+
+  delay(500); // Short delay for stability
+}
