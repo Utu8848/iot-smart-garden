@@ -1,6 +1,8 @@
 # iot-smart-garden
 Prototype Based Smart Garden System: Enhancing Plant Care Through IoT and Sensor Technology
 
+![](https://github.com/Utu8848/iot-smart-garden/blob/main/tinkercad%20circuit.png)
+
 # Smart Garden System: Enhancing Plant Care Through IoT and Sensor Technology
 
 A **Smart Garden System** designed and simulated using **Tinkercad**, leveraging **IoT** and **sensor technology** to automate plant care. The system integrates various sensors like **soil moisture**, **temperature**, **humidity**, **LDR** (Light Dependent Resistor), and **PIR** (Passive Infrared) to monitor environmental conditions in real-time. Actuators such as **DC motors**, **servo motors**, **LEDs**, and **buzzers** were programmed in **C++** to automate watering, lighting, and security alerts.
